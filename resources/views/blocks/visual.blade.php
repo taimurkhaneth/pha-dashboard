@@ -60,20 +60,12 @@
     border: 1.5px solid #e2e8f0;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.cat-tabs .nav-link.active[data-bs-target="#cat-B"],
-.block-tabs-B .nav-link.active {
-    background: linear-gradient(135deg, #2563eb, #1e40af);
+.cat-tabs .nav-link.active,
+.block-pills .nav-link.active {
+    background: linear-gradient(135deg, #1B6B35, #0f4423);
     color: #fff;
-    border-color: #1e40af;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-    transform: translateY(-1px);
-}
-.cat-tabs .nav-link.active[data-bs-target="#cat-E"],
-.block-tabs-E .nav-link.active {
-    background: linear-gradient(135deg, #16a34a, #166534);
-    color: #fff;
-    border-color: #166534;
-    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+    border-color: #0f4423;
+    box-shadow: 0 4px 12px rgba(27, 107, 53, 0.25);
     transform: translateY(-1px);
 }
 
@@ -126,7 +118,7 @@
     @foreach($categorizedBlocks as $category => $blocks)
         <li class="nav-item" role="presentation">
             <button class="nav-link {{ $loop->first ? 'active' : '' }} fw-bold px-5 py-2 rounded-pill mx-2 shadow-sm" 
-                id="cat-{{ $category }}-tab" data-bs-toggle="pill" data-bs-target="#cat-{{ $category }}" 
+                id="cat-{{ Str::slug($category) }}-tab" data-bs-toggle="pill" data-bs-target="#cat-{{ Str::slug($category) }}" 
                 type="button" role="tab" style="font-size: 15px;">
                 <i class="bi bi-layers-fill me-2"></i> Category {{ $category }}
             </button>
@@ -136,18 +128,18 @@
 
 <div class="tab-content" id="categoryTabsContent">
     @foreach($categorizedBlocks as $category => $blocks)
-        <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="cat-{{ $category }}" role="tabpanel">
+        <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="cat-{{ Str::slug($category) }}" role="tabpanel">
             
             <div class="chart-card mb-4" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(8px);">
                 <div class="d-flex align-items-center mb-2">
                     <h6 class="mb-0 fw-bold text-muted"><i class="bi bi-grid-3x3-gap-fill me-2"></i>Select Block</h6>
                 </div>
-                <ul class="nav nav-pills block-pills block-tabs-{{ $category }} flex-wrap gap-1" id="blockTabs-{{ $category }}" role="tablist">
+                <ul class="nav nav-pills block-pills block-tabs-{{ Str::slug($category) }} flex-wrap gap-1" id="blockTabs-{{ Str::slug($category) }}" role="tablist">
                     @foreach($blocks as $blockName => $floors)
                         <li class="nav-item" role="presentation">
                             <button class="nav-link {{ $loop->first ? 'active' : '' }}" 
-                                id="block-{{ $category }}-{{ $blockName }}-tab" data-bs-toggle="pill" 
-                                data-bs-target="#block-{{ $category }}-{{ $blockName }}" type="button" role="tab">
+                                id="block-{{ Str::slug($category) }}-{{ Str::slug($blockName) }}-tab" data-bs-toggle="pill" 
+                                data-bs-target="#block-{{ Str::slug($category) }}-{{ Str::slug($blockName) }}" type="button" role="tab">
                                 Block {{ $blockName }}
                             </button>
                         </li>
@@ -155,12 +147,17 @@
                 </ul>
             </div>
 
-            <div class="tab-content" id="blockTabsContent-{{ $category }}">
+            <div class="tab-content" id="blockTabsContent-{{ Str::slug($category) }}">
                 @foreach($blocks as $blockName => $floors)
-                    <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="block-{{ $category }}-{{ $blockName }}" role="tabpanel">
+                    <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="block-{{ Str::slug($category) }}-{{ Str::slug($blockName) }}" role="tabpanel">
                         
                         <div class="card border-0 shadow-sm" style="border-radius: 16px; overflow: hidden; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px);">
-                            <div class="card-header border-0 text-white d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, {{ $category === 'B' ? '#2563eb, #1e40af' : '#16a34a, #166534' }}); padding: 12px 20px;">
+                            @php
+                                $grad = '#1B6B35, #0f4423';
+                                if ($category === 'B') $grad = '#2563eb, #1e40af';
+                                elseif ($category === 'E') $grad = '#16a34a, #166534';
+                            @endphp
+                            <div class="card-header border-0 text-white d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, {{ $grad }}); padding: 12px 20px;">
                                 <h5 class="mb-0 fw-bold" style="font-size: 16px; letter-spacing: 0.5px;">
                                     <i class="bi bi-building me-2"></i> Category {{ $category }} — Block {{ $blockName }}
                                 </h5>
@@ -186,7 +183,7 @@
                                                 </span>
                                             </div>
                                             
-                                            <div class="d-flex gap-2 flex-grow-1 p-2 bg-white rounded shadow-sm border border-secondary border-opacity-10" style="min-width: 200px;">
+                                            <div class="d-flex flex-wrap gap-2 flex-grow-1 p-2 bg-white rounded shadow-sm border border-secondary border-opacity-10" style="min-width: 200px;">
                                                 @foreach($flats as $flat)
                                                     @php
                                                         $bgClass = 'bg-white';

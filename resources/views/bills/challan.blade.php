@@ -153,16 +153,16 @@
                             <td class="amt">{{ number_format($currentMaint) }}</td>
                         </tr>
                         @endif
-                        @if($allottee->watch_ward_charges > 0)
+                        @if($ww > 0)
                         <tr>
                             <td>Watch & Ward Charges</td>
-                            <td class="amt">{{ number_format($allottee->watch_ward_charges) }}</td>
+                            <td class="amt">{{ number_format($ww) }}</td>
                         </tr>
                         @endif
-                        @if($allottee->fine > 0)
+                        @if($fine > 0)
                         <tr>
                             <td>Delay Surcharge (Fine)</td>
-                            <td class="amt">{{ number_format($allottee->fine) }}</td>
+                            <td class="amt">{{ number_format($fine) }}</td>
                         </tr>
                         @endif
                         

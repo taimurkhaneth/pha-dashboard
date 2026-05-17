@@ -137,14 +137,15 @@
         <div class="pill-val">{{ number_format($totalAllottees) }}</div>
         <div class="pill-lbl">Total Allottees</div>
     </div>
-    <div class="kpi-pill pill-green">
-        <div class="pill-val">{{ number_format($totalB) }}</div>
-        <div class="pill-lbl">Category B <small>({{ number_format($areaB) }} Sq Ft)</small></div>
+    @php
+        $pillColors = ['pill-green', 'pill-teal', 'pill-purple', 'pill-orange', 'pill-red'];
+    @endphp
+    @foreach($categoryStats as $i => $cat)
+    <div class="kpi-pill {{ $pillColors[$i % count($pillColors)] }}">
+        <div class="pill-val">{{ number_format($cat->count) }}</div>
+        <div class="pill-lbl">Cat {{ $cat->name }} <small>({{ number_format($cat->typical_area) }} Sq Ft)</small></div>
     </div>
-    <div class="kpi-pill pill-teal">
-        <div class="pill-val">{{ number_format($totalE) }}</div>
-        <div class="pill-lbl">Category E <small>({{ number_format($areaE) }} Sq Ft)</small></div>
-    </div>
+    @endforeach
     <div class="kpi-pill pill-orange">
         <div class="pill-val">Rs. {{ number_format($totalMonthlyBilling) }}</div>
         <div class="pill-lbl">Monthly Billing (Est.)</div>
@@ -180,18 +181,14 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @foreach($categoryStats as $cat)
                     <tr>
-                        <td><span class="badge badge-b">B-Type</span></td>
-                        <td>{{ number_format($areaB) }}</td><td>Rs. {{ number_format($maintenanceRate,2) }}</td>
-                        <td><strong>Rs. {{ number_format($monthlyB,2) }}</strong></td>
-                        <td>Rs. {{ number_format($yearlyB,2) }}</td>
+                        <td><span class="badge bg-secondary">{{ $cat->name }}</span></td>
+                        <td>{{ number_format($cat->typical_area) }}</td><td>Rs. {{ number_format($maintenanceRate,2) }}</td>
+                        <td><strong>Rs. {{ number_format($cat->monthly_per_unit,2) }}</strong></td>
+                        <td>Rs. {{ number_format($cat->yearly_per_unit,2) }}</td>
                     </tr>
-                    <tr>
-                        <td><span class="badge badge-e">E-Type</span></td>
-                        <td>{{ number_format($areaE) }}</td><td>Rs. {{ number_format($maintenanceRate,2) }}</td>
-                        <td><strong>Rs. {{ number_format($monthlyE,2) }}</strong></td>
-                        <td>Rs. {{ number_format($yearlyE,2) }}</td>
-                    </tr>
+                    @endforeach
                 </tbody>
             </table>
             <div class="formula-box">
@@ -200,7 +197,8 @@
         </div>
 
         {{-- W&W Eligibility --}}
-        <div class="chart-card">
+        @if($wwAmount > 0)
+        <div class="chart-card mt-3">
             <h6 class="section-title"><i class="bi bi-shield-check me-2"></i>Watch &amp; Ward Eligibility <span class="badge-policy ms-2">Rs. {{ number_format($wwAmount) }}/-</span> <i class="bi bi-info-circle ms-auto text-muted" style="font-size: 14px; cursor: pointer;" data-bs-toggle="tooltip" data-bs-placement="top" title="Displays the number of allottees eligible for Watch & Ward charges based on their possession dates."></i></h6>
             @php $wwDate = date('d-m-Y', strtotime($wwCutoff)); @endphp
             <div class="row g-2 mt-1">
@@ -239,6 +237,7 @@
                 Total Recoverable: <strong>Rs. {{ number_format($totalWWRecoverable) }}</strong>
             </div>
         </div>
+        @endif
     </div>
 
     {{-- COL 2: Monthly Billing Donut + Trend --}}
@@ -247,15 +246,13 @@
             <h6 class="section-title"><i class="bi bi-pie-chart-fill me-2" style="color:#1B6B35;"></i>Monthly Billing by Category <i class="bi bi-info-circle ms-auto text-muted" style="font-size: 14px; cursor: pointer;" data-bs-toggle="tooltip" data-bs-placement="top" title="A breakdown of expected monthly revenue divided between Category B and Category E."></i></h6>
             <p class="chart-sub">Total monthly charges — Cat B vs Cat E</p>
             <div id="donutCategory"></div>
-            <div class="d-flex justify-content-around mt-2">
+            <div class="d-flex flex-wrap justify-content-around mt-2 gap-2">
+                @foreach($categoryStats as $cat)
                 <div class="text-center">
-                    <div style="font-size:16px;font-weight:800;color:#2563eb;">Rs. {{ number_format($totalMonthlyB/1000000,3) }}M</div>
-                    <div style="font-size:11px;color:#94a3b8;">Category B</div>
+                    <div style="font-size:14px;font-weight:800;color:#334155;">Rs. {{ number_format($cat->total_monthly/1000000,3) }}M</div>
+                    <div style="font-size:10px;color:#94a3b8;">{{ $cat->name }}</div>
                 </div>
-                <div class="text-center">
-                    <div style="font-size:16px;font-weight:800;color:#1B6B35;">Rs. {{ number_format($totalMonthlyE/1000000,3) }}M</div>
-                    <div style="font-size:11px;color:#94a3b8;">Category E</div>
-                </div>
+                @endforeach
             </div>
         </div>
         <div class="chart-card">
@@ -272,8 +269,10 @@
             <table class="table table-sm mb-0" style="font-size:12px;">
                 <tr><td class="text-muted">Total Monthly Maintenance (All)</td><td class="text-end fw-600">Rs. {{ number_format($totalMonthlyBilling) }}</td></tr>
                 <tr><td class="text-muted">Total Yearly Maintenance (All)</td><td class="text-end fw-600">Rs. {{ number_format($forecastYearly) }}</td></tr>
+                @if($wwAmount > 0)
                 <tr><td class="text-muted">Total W&W Recoverable</td><td class="text-end fw-600">Rs. {{ number_format($totalWWRecoverable) }}</td></tr>
                 <tr style="background:#f0f4f8;"><td class="fw-700">Subtotal (Maint. + W&W)</td><td class="text-end fw-700">Rs. {{ number_format($subtotal) }}</td></tr>
+                @endif
                 <tr><td class="text-muted" style="color:#dc2626;">Total Delay Charges ({{ $delayPct }}%)</td><td class="text-end" style="color:#dc2626;font-weight:700;">Rs. {{ number_format($totalDelayCharges) }}</td></tr>
             </table>
             <div class="grand-total-box mt-2">
@@ -302,12 +301,14 @@
         <div class="chart-card">
             <h6 class="section-title"><i class="bi bi-file-text me-2" style="color:#475569;"></i>Policy & Calculation Logic <i class="bi bi-info-circle ms-auto text-muted" style="font-size: 14px; cursor: pointer;" data-bs-toggle="tooltip" data-bs-placement="top" title="Explains the exact mathematical formulas used to calculate the bills."></i></h6>
             <div class="policy-box" style="font-size:11px;line-height:1.7;">
+                @if($wwAmount > 0)
                 <p><strong>1. Watch & Ward (Rs. {{ number_format($wwAmount) }}/-) applies if:</strong><br>
-                   &nbsp;&nbsp;• Possession Date ≥ {{ date('d M Y', strtotime($wwCutoff)) }}<br>
+                   &nbsp;&nbsp;• Possession Date is ON or AFTER {{ date('d M Y', strtotime($wwCutoff)) }}<br>
                    &nbsp;&nbsp;• OR Possession Date is NULL</p>
+                @endif
                 <p><strong>2. Maintenance Charges Formula:</strong><br>
                    &nbsp;&nbsp;Maintenance = Rs. {{ $maintenanceRate }} × Area (Sq Ft) × Months<br>
-                   &nbsp;&nbsp;B-Type: 1496 Sq Ft | E-Type: 972 Sq Ft</p>
+                   &nbsp;&nbsp;As per unit specific covered area</p>
                 <p class="mb-0"><strong>3. Delay Charges (Fine):</strong><br>
                    &nbsp;&nbsp;{{ $delayPct }}% of (Maintenance + W&W Charges)</p>
             </div>
@@ -447,9 +448,10 @@
                     <h6 class="section-title mb-0 w-100 d-flex"><i class="bi bi-bar-chart-fill me-2" style="color:#7c3aed;"></i>Block-wise Allottee Distribution <i class="bi bi-info-circle ms-auto text-muted" style="font-size: 14px; cursor: pointer;" data-bs-toggle="tooltip" data-bs-placement="top" title="Visualizes occupancy and transfer statuses across different apartment blocks."></i></h6>
                     <p class="chart-sub mb-0 mt-1">Number of allottees per block — showing occupancy, hand-over, and transfer status</p>
                 </div>
-                <select id="blockCategoryFilter" class="form-select form-select-sm" style="width: 150px; font-weight: 600;">
-                    <option value="B">Category B (24 Blocks)</option>
-                    <option value="E">Category E (19 Blocks)</option>
+                <select id="blockCategoryFilter" class="form-select form-select-sm" style="width: 180px; font-weight: 600;">
+                    @foreach($categoryStats as $cat)
+                    <option value="{{ $cat->name }}">{{ $cat->name }} ({{ number_format($cat->count) }} units)</option>
+                    @endforeach
                 </select>
             </div>
             
@@ -584,15 +586,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const phaGreen='#1B6B35', phaBlue='#2563eb', phaAmber='#d97706';
 
     // 1. Category Donut
+    const catStats = @json($categoryStats);
+    const chartColors = ['#2563eb', '#1B6B35', '#d97706', '#7c3aed', '#0d9488'];
+    
     new ApexCharts(document.querySelector('#donutCategory'), {
         chart: { 
             type: 'donut', 
             height: 250,
             dropShadow: { enabled: true, top: 4, left: 0, blur: 5, color: '#000', opacity: 0.1 }
         },
-        series: [{{ round($billingByCategory['B']) }}, {{ round($billingByCategory['E']) }}],
-        labels: ['Cat B ({{ $areaB }} Sq Ft)', 'Cat E ({{ $areaE }} Sq Ft)'],
-        colors: [phaBlue, phaGreen],
+        series: catStats.map(c => Math.round(c.total_monthly)),
+        labels: catStats.map(c => c.name + ' (' + c.typical_area + ' SqFt)'),
+        colors: chartColors,
         legend: { position: 'bottom', fontSize: '12px', fontWeight: 600, markers: { radius: 12 } },
         dataLabels: { 
             enabled: true, 
@@ -620,16 +625,25 @@ document.addEventListener('DOMContentLoaded', function () {
     // 2. Monthly Billing Trend
     const trendData = @json($trendData);
     if (trendData && trendData.length > 0) {
+        
+        let seriesData = [
+            { name: 'Total', data: trendData.map(d => d.total) }
+        ];
+        catStats.forEach((cat, index) => {
+            seriesData.push({
+                name: cat.name,
+                data: trendData.map(d => d[cat.name] || 0)
+            });
+        });
+        
+        let trendColors = [phaAmber].concat(chartColors);
+
         new ApexCharts(document.querySelector('#trendChart'), {
             chart: { type: 'area', height: 210, toolbar: { show: false } },
-            series: [
-                { name: 'Total', data: trendData.map(d => d.total) },
-                { name: 'Cat B', data: trendData.map(d => d.B) },
-                { name: 'Cat E', data: trendData.map(d => d.E) },
-            ],
+            series: seriesData,
             xaxis: { categories: trendData.map(d => d.label), labels: { style: { fontSize: '10px', fontWeight: 600, colors: '#64748b' } } },
-            colors: [phaAmber, phaBlue, phaGreen],
-            stroke: { curve: 'smooth', width: [3, 2, 2] },
+            colors: trendColors,
+            stroke: { curve: 'smooth', width: trendColors.map(() => 2) },
             fill: { 
                 type: 'gradient', 
                 gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 90, 100] } 
@@ -643,28 +657,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }).render();
     }
 
-    // 3. City Radar (Spider Web) Chart
+    // 3. City Bar Chart
     const cityData = @json($cityData);
     if (cityData && cityData.length > 0) {
-        // Limit to top 8 cities for better spider web readability
+        // Limit to top 8 cities for better readability
         const topCities = cityData.slice(0, 8);
         new ApexCharts(document.querySelector('#cityBar'), {
-            chart: { type: 'radar', height: 320, toolbar: { show: false } },
+            chart: { type: 'bar', height: 320, toolbar: { show: false } },
             series: [{ name: 'Allottees', data: topCities.map(c => c.count) }],
-            labels: topCities.map(c => c.city || 'Unknown'),
-            stroke: { width: 2, colors: ['#d97706'] },
-            fill: { opacity: 0.3, colors: ['#fbbf24'] },
-            markers: { size: 5, colors: ['#fff'], strokeColors: '#d97706', strokeWidth: 2 },
-            yaxis: { show: false },
+            xaxis: { 
+                categories: topCities.map(c => c.city || 'Unknown'),
+                labels: { style: { fontSize: '11px', fontWeight: 600, colors: '#475569' } }
+            },
+            colors: ['#d97706', '#1B6B35', '#2563eb', '#7c3aed', '#059669', '#dc2626', '#0284c7', '#db2777'],
             plotOptions: {
-                radar: {
-                    polygons: {
-                        strokeColors: '#e2e8f0',
-                        connectorColors: '#e2e8f0'
-                    }
+                bar: {
+                    borderRadius: 6,
+                    columnWidth: '55%',
+                    distributed: true
                 }
             },
-            dataLabels: { enabled: true, style: { fontSize: '10px', colors: ['#1e293b'] } },
+            dataLabels: { enabled: true, style: { fontSize: '11px' } },
+            legend: { show: false },
+            grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
             tooltip: { theme: 'light', y: { formatter: v => v.toLocaleString() + ' allottees' } }
         }).render();
     }
@@ -741,9 +756,9 @@ document.addEventListener('DOMContentLoaded', function () {
         tbody.innerHTML = html;
     }
 
-    if (blockDataAll && blockDataAll.length > 0) {
-        // Init with Cat B
-        renderBlockChart('B');
+    if (blockDataAll && blockDataAll.length > 0 && catStats.length > 0) {
+        // Init with first category
+        renderBlockChart(catStats[0].name);
 
         document.getElementById('blockCategoryFilter').addEventListener('change', function(e) {
             renderBlockChart(e.target.value);
@@ -790,19 +805,24 @@ document.addEventListener('DOMContentLoaded', function () {
         }).render();
     }
 
-    // 7. BPS Demographic Pie Chart
+    // 7. BPS Demographic Bar Chart
     const bpsData = @json($bpsDistribution);
     if (bpsData && bpsData.length > 0) {
-        new ApexCharts(document.querySelector('#bpsChart'), {
-            chart: { type: 'pie', height: 280, toolbar: { show: false } },
-            series: bpsData.map(d => d.count),
-            labels: bpsData.map(d => 'BPS ' + d.bps),
-            colors: ['#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#22c55e', '#06b6d4', '#3b82f6', '#6366f1'],
-            legend: { position: 'right', fontSize: '10px' },
-            dataLabels: { enabled: true, formatter: (val, opts) => opts.w.config.series[opts.seriesIndex] },
-            stroke: { width: 1, colors: ['#fff'] },
-            tooltip: { y: { formatter: v => v + ' allottees' } }
-        }).render();
+        let totalBps = bpsData.reduce((acc, curr) => acc + curr.count, 0);
+        if (totalBps > 0) {
+            new ApexCharts(document.querySelector('#bpsChart'), {
+                chart: { type: 'bar', height: 280, toolbar: { show: false } },
+                series: [{ name: 'Allottees', data: bpsData.map(d => d.count) }],
+                xaxis: { categories: bpsData.map(d => d.label) },
+                plotOptions: { bar: { horizontal: true, borderRadius: 4, distributed: true } },
+                colors: ['#0ea5e9', '#8b5cf6'],
+                legend: { show: false },
+                dataLabels: { enabled: true, style: { fontSize: '12px' } },
+                tooltip: { y: { formatter: v => v + ' allottees' } }
+            }).render();
+        } else {
+            document.querySelector('#bpsChart').innerHTML = '<div class="text-center text-muted" style="padding-top:100px;">No BPS Data Available for this Project</div>';
+        }
     }
 
     // 8. Historical Possession Timeline

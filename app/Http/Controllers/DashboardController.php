@@ -23,24 +23,39 @@ class DashboardController extends Controller
         $wwAmount        = (float) Setting::getValue('watch_ward_amount', 10000);
         $wwCutoff        = Setting::getValue('watch_ward_cutoff_date', '2023-07-23');
         $delayPct        = (float) Setting::getValue('delay_charge_percent', 10);
-        $areaB           = (int)   Setting::getValue('area_b', 1496);
-        $areaE           = (int)   Setting::getValue('area_e', 972);
+        
+        $activeProject = \App\Models\Project::active();
+        if ($activeProject) {
+            $maintenanceRate = $activeProject->maintenance_rate;
+            $wwAmount        = $activeProject->ww_amount;
+            $wwCutoff        = $activeProject->ww_cutoff_date;
+            $delayPct        = $activeProject->delay_percent;
+        }
 
-        // ── ALLOTTEE COUNTS ────────────────────────────────────────────
-        $totalAllottees = Allottee::count();
-        $totalB         = Allottee::where('category', 'B')->count();
-        $totalE         = Allottee::where('category', 'E')->count();
+        // ── CATEGORY STATS (Dynamic) ───────────────────────────────────
+        $categoryStatsRaw = Allottee::select(
+            'category', 
+            DB::raw('COUNT(*) as count'), 
+            DB::raw('MAX(covered_area) as typical_area'),
+            DB::raw('SUM(covered_area) as total_area')
+        )->whereNotNull('category')->where('category', '!=', '')->groupBy('category')->orderBy('category')->get();
 
-        // ── STANDARD CHARGES TABLE (from settings) ────────────────────
-        $monthlyB  = $areaB * $maintenanceRate;
-        $monthlyE  = $areaE * $maintenanceRate;
-        $yearlyB   = $monthlyB * 12;
-        $yearlyE   = $monthlyE * 12;
+        $totalAllottees = $categoryStatsRaw->sum('count');
+        $totalMonthlyBilling = 0;
 
-        // ── TOTAL MONTHLY BILLING (estimated) ─────────────────────────
-        $totalMonthlyB       = (float) DB::table('allottees')->where('category','B')->sum(DB::raw('covered_area * ' . $maintenanceRate));
-        $totalMonthlyE       = (float) DB::table('allottees')->where('category','E')->sum(DB::raw('covered_area * ' . $maintenanceRate));
-        $totalMonthlyBilling = $totalMonthlyB + $totalMonthlyE;
+        $categoryStats = [];
+        foreach ($categoryStatsRaw as $cat) {
+            $catMonthly = $cat->total_area * $maintenanceRate;
+            $totalMonthlyBilling += $catMonthly;
+            $categoryStats[] = (object) [
+                'name' => $cat->category,
+                'count' => $cat->count,
+                'typical_area' => $cat->typical_area,
+                'monthly_per_unit' => $cat->typical_area * $maintenanceRate,
+                'yearly_per_unit' => $cat->typical_area * $maintenanceRate * 12,
+                'total_monthly' => $catMonthly
+            ];
+        }
         
         // ── YEARLY ACTUAL VS FORECAST ─────────────────────────────────
         $forecastYearly = $totalMonthlyBilling * 12;
@@ -58,19 +73,21 @@ class DashboardController extends Controller
         $now = Carbon::now();
 
         foreach ($allAllottees as $a) {
-            $startDate = clone $wwStartDate;
+            $endDate = $a->possession_date ? clone $a->possession_date : $now;
             if ($a->possession_date) {
                 if ($a->possession_date->lt($wwStartDate)) {
                     $wwBeforeCount++;
                 } else {
                     $wwAfterCount++;
-                    $startDate = $a->possession_date;
                 }
             } else {
                 $wwNullCount++;
             }
             
-            $months = max(0, $startDate->diffInMonths($now));
+            $months = 0;
+            if ($endDate->gt($wwStartDate)) {
+                $months = $wwStartDate->diffInMonths($endDate);
+            }
             $totalWWRecoverable += ($months * $wwAmount);
         }
         
@@ -106,31 +123,23 @@ class DashboardController extends Controller
             $month    = $endDate->copy()->subMonths($i);
             $monthEnd = $month->copy()->endOfMonth()->format('Y-m-d');
 
-            $bTotal = DB::selectOne(
-                "SELECT COALESCE(SUM(covered_area),0)*? as total FROM allottees
-                 WHERE category='B' AND (possession_date IS NULL OR possession_date <= ?)",
-                [$maintenanceRate, $monthEnd]
-            );
-            $eTotal = DB::selectOne(
-                "SELECT COALESCE(SUM(covered_area),0)*? as total FROM allottees
-                 WHERE category='E' AND (possession_date IS NULL OR possession_date <= ?)",
-                [$maintenanceRate, $monthEnd]
-            );
-            $b = round((float)$bTotal->total);
-            $e = round((float)$eTotal->total);
-            $trendData[] = [
+            $monthData = [
                 'label' => $month->format('M-y'),
-                'B'     => $b,
-                'E'     => $e,
-                'total' => $b + $e,
+                'total' => 0
             ];
+            
+            foreach ($categoryStats as $cat) {
+                $totalForCat = Allottee::where('category', $cat->name)
+                    ->where(function($q) use ($monthEnd) {
+                        $q->whereNull('possession_date')
+                          ->orWhere('possession_date', '<=', $monthEnd);
+                    })->sum('covered_area') * $maintenanceRate;
+                    
+                $monthData[$cat->name] = round($totalForCat);
+                $monthData['total'] += round($totalForCat);
+            }
+            $trendData[] = $monthData;
         }
-
-        // ── CATEGORY BILLING SPLIT (donut) ────────────────────────────
-        $billingByCategory = [
-            'B' => $totalMonthlyB,
-            'E' => $totalMonthlyE,
-        ];
 
         // ── CITY-WISE ─────────────────────────────────────────────────
         $cityData = Allottee::select(
@@ -146,18 +155,27 @@ class DashboardController extends Controller
         $sampleAllottees = Allottee::orderByDesc('total_maintenance_charges')->limit(15)->get();
 
         // ── BPS + DUE MONTHS + POSSESSION (for charts) ───────────────
-        $bpsRaw = Allottee::select('bps', DB::raw('count(*) as count'))
-                                ->whereNotNull('bps')->where('bps', '!=', '')->groupBy('bps')->get();
-        
-        $bpsDistribution = $bpsRaw->filter(function($item) {
-            $val = preg_replace('/[^0-9]/', '', $item->bps);
-            return is_numeric($val) && $val >= 1 && $val <= 22;
-        })->map(function($item) {
-            $item->bps = (int) preg_replace('/[^0-9]/', '', $item->bps);
-            return $item;
-        })->groupBy('bps')->map(function($group, $key) {
-            return (object)['bps' => $key, 'count' => $group->sum('count')];
-        })->sortBy('bps')->values();
+        $allBps = Allottee::select('bps')->get();
+        $govtCount = 0;
+        $gpCount = 0;
+        foreach ($allBps as $b) {
+            $val = strtoupper(trim($b->bps ?? ''));
+            if ($val === '') continue;
+            if ($val === 'GP' || str_contains($val, 'GENERAL')) {
+                $gpCount++;
+            } else {
+                $num = (int) preg_replace('/[^0-9]/', '', $val);
+                if ($num >= 1 && $num <= 22) {
+                    $govtCount++;
+                } else {
+                    $gpCount++;
+                }
+            }
+        }
+        $bpsDistribution = [
+            (object)['label' => 'Govt Employees (BPS)', 'count' => $govtCount],
+            (object)['label' => 'General Public (GP)', 'count' => $gpCount]
+        ];
         $monthsDistribution = Allottee::select('due_months', DB::raw('count(*) as count'))
                                 ->whereNotNull('due_months')->groupBy('due_months')
                                 ->orderBy('due_months')->get();
@@ -197,16 +215,15 @@ class DashboardController extends Controller
             ->where('transfer', '!=', '')->where('transfer', '!=', '0')->count();
 
         return view('dashboard.index', compact(
-            'totalAllottees', 'totalB', 'totalE',
-            'areaB', 'areaE', 'maintenanceRate', 'wwAmount', 'wwCutoff', 'delayPct',
-            'monthlyB', 'monthlyE', 'yearlyB', 'yearlyE',
-            'totalMonthlyB', 'totalMonthlyE', 'totalMonthlyBilling', 'forecastYearly', 'actualYearly',
+            'totalAllottees', 'categoryStats',
+            'maintenanceRate', 'wwAmount', 'wwCutoff', 'delayPct',
+            'totalMonthlyBilling', 'forecastYearly', 'actualYearly',
             'wwBeforeCount', 'wwAfterCount', 'wwNullCount',
             'wwBeforeAmount', 'wwAfterAmount', 'wwNullAmount', 'totalWWRecoverable',
             'subtotal', 'totalDelayCharges', 'grandTotal',
             'totalPaid', 'totalPending',
             'threshold', 'topCount', 'totalDefaulters', 'defaulters',
-            'trendData', 'billingByCategory', 'cityData',
+            'trendData', 'cityData',
             'sampleAllottees', 'bpsDistribution', 'monthsDistribution', 'possessionTimeline',
             'settings',
             // block analytics

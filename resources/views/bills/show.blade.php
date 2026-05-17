@@ -380,7 +380,7 @@
                 <tr>
                     <td>
                         <strong>Watch & Ward Charges</strong>
-                        <div style="font-size:10px;color:#6b7280;">(From max of Possession Date or 01-Jul-2023)</div>
+                        <div style="font-size:10px;color:#6b7280;">From 01-Jul-2023 to Possession Date</div>
                     </td>
                     <td class="text-center">Rs. {{ number_format($wwAmount) }}/month</td>
                     <td class="text-center">{{ $wwMonths }} month(s)</td>

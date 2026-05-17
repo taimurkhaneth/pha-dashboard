@@ -221,7 +221,7 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size:10px; color:#1a233
       @endif
       @if($ww > 0)
       <tr>
-        <td><span class="fw">Watch &amp; Ward Charges</span><br><span style="font-size:8px;color:#6b7280;">From max(Possession Date, 01-Jul-2023)</span></td>
+        <td><span class="fw">Watch &amp; Ward Charges</span><br><span style="font-size:8px;color:#6b7280;">From 01-Jul-2023 to Possession Date</span></td>
         <td class="tc">{{ number_format($wwAmount) }}</td>
         <td class="tc">{{ $wwMonths }} month(s)</td>
         <td class="tr fw">{{ number_format($ww,2) }}</td>
@@ -288,7 +288,9 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size:10px; color:#1a233
       <li>For queries, contact PHA office: Ministry of Housing &amp; Works, Islamabad.</li>
       <li>Online payment via Raast/1Link: use File No. <strong>{{ $allottee->file_no }}</strong> as reference.</li>
       <li>This is a computer-generated bill. No signature or stamp is required.</li>
-      <li>Watch &amp; Ward charges apply if possession date is on/after 23-Jul-2023 or not recorded.</li>
+      @if($wwAmount > 0)
+      <li>Watch &amp; Ward charges apply from 01-Jul-2023 to Possession Date.</li>
+      @endif
     </ul>
   </div>
 </td>

@@ -82,87 +82,105 @@
 
     <div class="row g-3">
         <!-- Bill Breakdown / History -->
-        <div class="col-md-6">
-            <div class="allottee-card h-100">
-                @if($hasMonthlyBills)
-                    <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-calendar3 me-2" style="color:#1B6B35;"></i>Monthly Bills History</h6>
-                    <div class="table-responsive">
-                        <table class="table mb-0" style="font-size: 12px; vertical-align: middle;">
-                            <thead>
-                                <tr>
-                                    <th class="text-muted border-0 pb-2">Month</th>
-                                    <th class="text-muted border-0 pb-2 text-end">Amount</th>
-                                    <th class="text-muted border-0 pb-2">Status</th>
-                                    <th class="text-muted border-0 pb-2 text-end">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($monthlyBills as $mb)
-                                    <tr>
-                                        <td class="fw-bold">{{ \Carbon\Carbon::parse($mb->bill_month)->format('M Y') }}</td>
-                                        <td class="text-end fw-bold">Rs. {{ number_format($mb->total_amount) }}</td>
-                                        <td>
-                                            @if($mb->status === 'paid' || $mb->status === 'settled')
-                                                <span class="badge bg-success bg-opacity-25 text-success border border-success">Paid</span>
-                                            @else
-                                                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger">Unpaid</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-end">
-                                            <a href="{{ route('portal.bill.monthly', $mb->bill_month) }}" class="btn btn-sm" style="background:#1B6B35;color:#fff;font-size:10px;padding:4px 8px;">View</a>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-receipt me-2" style="color:#1B6B35;"></i>Your Bill Breakdown</h6>
-                    <div class="bill-row">
-                        <span class="bill-label">Maintenance Charges</span>
-                        <span class="bill-value">Rs. {{ number_format($allottee->maintenance_charges) }}</span>
-                    </div>
-                    <div class="bill-row">
-                        <span class="bill-label">Watch & Ward Charges</span>
-                        <span class="bill-value">Rs. {{ number_format($allottee->watch_ward_charges) }}</span>
-                    </div>
-                    <div class="bill-row">
-                        <span class="bill-label">Delay Charges (10% Fine)</span>
-                        <span class="bill-value" style="color:#dc2626;">Rs. {{ number_format($allottee->fine) }}</span>
-                    </div>
-                    <div class="total-box mt-3">
-                        <div style="font-size:11px;opacity:0.8;">TOTAL PAYABLE</div>
-                        <div style="font-size:24px;font-weight:900;">Rs. {{ number_format($allottee->total_maintenance_charges) }}</div>
-                        <div style="font-size:11px;opacity:0.7;">{{ $allottee->due_months ?? 0 }} months overdue</div>
-                    </div>
-
-                    <!-- Payment Status -->
-                    <div class="row g-2 mt-3">
-                        <div class="col-6">
-                            <div style="background:#dcfce7;border-radius:10px;padding:12px;text-align:center;">
-                                <div style="font-size:10px;font-weight:600;color:#166534;">AMOUNT PAID</div>
-                                <div style="font-size:18px;font-weight:800;color:#1B6B35;">Rs. {{ number_format($allottee->amount_paid) }}</div>
-                                @if($allottee->payment_date)
-                                    <div style="font-size:10px;color:#166534;">{{ $allottee->payment_date->format('d M Y') }}</div>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div style="background:#fee2e2;border-radius:10px;padding:12px;text-align:center;">
-                                <div style="font-size:10px;font-weight:600;color:#991b1b;">AMOUNT PENDING</div>
-                                <div style="font-size:18px;font-weight:800;color:#dc2626;">Rs. {{ number_format($allottee->amount_pending) }}</div>
-                                @if($allottee->payment_mode)
-                                    <div style="font-size:10px;color:#991b1b;">via {{ ucfirst($allottee->payment_mode) }}</div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+        <div class="col-md-7">
+            <div class="allottee-card mb-3">
+                <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-receipt me-2" style="color:#1B6B35;"></i>Current Account Snapshot</h6>
+                <div class="bill-row">
+                    <span class="bill-label">Maintenance Charges</span>
+                    <span class="bill-value">Rs. {{ number_format($allottee->maintenance_charges) }}</span>
+                </div>
+                @if($allottee->watch_ward_charges > 0)
+                <div class="bill-row">
+                    <span class="bill-label">Watch & Ward Charges</span>
+                    <span class="bill-value">Rs. {{ number_format($allottee->watch_ward_charges) }}</span>
+                </div>
                 @endif
+                @if($allottee->fine > 0)
+                <div class="bill-row">
+                    <span class="bill-label">Delay Charges (10% Fine)</span>
+                    <span class="bill-value" style="color:#dc2626;">Rs. {{ number_format($allottee->fine) }}</span>
+                </div>
+                @endif
+                <div class="total-box mt-3">
+                    <div style="font-size:11px;opacity:0.8;">TOTAL PAYABLE</div>
+                    <div style="font-size:24px;font-weight:900;">Rs. {{ number_format($allottee->total_maintenance_charges) }}</div>
+                    <div style="font-size:11px;opacity:0.7;">{{ $allottee->due_months ?? 0 }} months overdue</div>
+                </div>
+
+                <!-- Payment Status -->
+                <div class="row g-2 mt-3">
+                    <div class="col-6">
+                        <div style="background:#dcfce7;border-radius:10px;padding:12px;text-align:center;">
+                            <div style="font-size:10px;font-weight:600;color:#166534;">AMOUNT PAID</div>
+                            <div style="font-size:18px;font-weight:800;color:#1B6B35;">Rs. {{ number_format($allottee->amount_paid) }}</div>
+                            @if($allottee->payment_date)
+                                <div style="font-size:10px;color:#166534;">{{ $allottee->payment_date->format('d M Y') }}</div>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div style="background:#fee2e2;border-radius:10px;padding:12px;text-align:center;">
+                            <div style="font-size:10px;font-weight:600;color:#991b1b;">AMOUNT PENDING</div>
+                            <div style="font-size:18px;font-weight:800;color:#dc2626;">Rs. {{ number_format($allottee->amount_pending) }}</div>
+                            @if($allottee->payment_mode)
+                                <div style="font-size:10px;color:#991b1b;">via {{ ucfirst($allottee->payment_mode) }}</div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if($hasMonthlyBills)
+            <div class="allottee-card mb-3">
+                <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-calendar3 me-2" style="color:#1B6B35;"></i>Monthly Bills History</h6>
+                <div class="table-responsive">
+                    <table class="table mb-0" style="font-size: 12px; vertical-align: middle;">
+                        <thead>
+                            <tr>
+                                <th class="text-muted border-0 pb-2">Month</th>
+                                <th class="text-muted border-0 pb-2 text-end">Amount</th>
+                                <th class="text-muted border-0 pb-2">Status</th>
+                                <th class="text-muted border-0 pb-2 text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($monthlyBills as $mb)
+                                <tr>
+                                    <td class="fw-bold">{{ \Carbon\Carbon::parse($mb->bill_month)->format('M Y') }}</td>
+                                    <td class="text-end fw-bold">Rs. {{ number_format($mb->total_amount) }}</td>
+                                    <td>
+                                        @if($mb->status === 'paid' || $mb->status === 'settled')
+                                            <span class="badge bg-success bg-opacity-25 text-success border border-success">Paid</span>
+                                        @else
+                                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger">Unpaid</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{{ route('portal.bill.monthly', $mb->bill_month) }}" class="btn btn-sm" style="background:#1B6B35;color:#fff;font-size:10px;padding:4px 8px;">View</a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
+            <div class="allottee-card mb-3">
+                <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-credit-card-fill me-2" style="color:#2563eb;"></i>Payment Instructions</h6>
+                <div style="background:#f0fdf4; border:1px solid #16a34a; border-radius:8px; padding:14px; margin-bottom:14px; text-align:center;">
+                    <div style="font-size:11px; font-weight:700; color:#166534; text-transform:uppercase; margin-bottom:4px;">1-Bill Consumer No.</div>
+                    <div style="font-size:22px; font-weight:900; letter-spacing:2px; color:#1a2332;">PHAF-{{ preg_replace('/[^A-Za-z0-9]/', '', $allottee->block_no ?? 'X') }}{{ str_pad(preg_replace('/[^0-9]/', '', $allottee->flat_no ?? '0'), 3, '0', STR_PAD_LEFT) }}-{{ date('Ym') }}</div>
+                </div>
+                <div style="font-size:12px; color:#374151;">
+                    <strong>Over the Counter:</strong> Present your invoice/bill to any Bank Representative specifying 1-Bill Consumer No.<br><br>
+                    <strong>Online Banking:</strong> Open your mobile banking app, select 1-Bill (Invoice), and enter the consumer number above.
+                </div>
             </div>
         </div>
 
         <!-- Property & Personal Info -->
-        <div class="col-md-6">
+        <div class="col-md-5">
             <div class="allottee-card h-100">
                 <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-house-fill me-2" style="color:#2563eb;"></i>Property & Personal Details</h6>
                 <div class="info-grid">

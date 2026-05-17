@@ -15,10 +15,19 @@ class BillController extends Controller
     /* ── shared: build all bill data for one allottee ── */
     private function billData(Allottee $allottee): array
     {
+        $activeProject = \App\Models\Project::active();
         $rate = (float) Setting::getValue('maintenance_rate_per_sqft', 3.07);
         $wwAmount = (float) Setting::getValue('watch_ward_amount', 10000);
         $wwCutoff = Setting::getValue('watch_ward_cutoff_date', '2023-07-23');
         $delayPct = (float) Setting::getValue('delay_charge_percent', 10);
+        
+        if ($activeProject) {
+            $rate = $activeProject->maintenance_rate;
+            $wwAmount = $activeProject->ww_amount;
+            $wwCutoff = $activeProject->ww_cutoff_date;
+            $delayPct = $activeProject->delay_percent;
+        }
+
         $bankAccNo = Setting::getValue('bank_account_no', 'PHA-0001-0001-001');
         $bankName = Setting::getValue('bank_name', 'National Bank of Pakistan');
         $bankBranch = Setting::getValue('bank_branch', 'Islamabad Main Branch');
@@ -26,12 +35,13 @@ class BillController extends Controller
         $monthlyRate = $allottee->covered_area * $rate;
         $maintenance = $allottee->maintenance_charges;
         
-        // Watch & Ward Logic (Months from 01 July 2023 or Possession Date to Now)
+        // Watch & Ward Logic: Charged for completed months between 01-Jul-2023 and Possession Date.
         $wwStartDate = Carbon::create(2023, 7, 1);
-        if ($allottee->possession_date && $allottee->possession_date->gt($wwStartDate)) {
-            $wwStartDate = $allottee->possession_date;
+        $wwEndDate = $allottee->possession_date ? clone $allottee->possession_date : Carbon::now();
+        $wwMonths = 0;
+        if ($wwEndDate->gt($wwStartDate)) {
+            $wwMonths = $wwStartDate->diffInMonths($wwEndDate);
         }
-        $wwMonths = max(0, $wwStartDate->diffInMonths(Carbon::now()));
         $ww = $wwMonths * $wwAmount;
         
         $fine = $allottee->fine;

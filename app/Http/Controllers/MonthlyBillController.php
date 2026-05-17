@@ -46,6 +46,13 @@ class MonthlyBillController extends Controller
         $wwAmt    = (float) Setting::getValue('watch_ward_amount', 10000);
         $delayPct = (float) Setting::getValue('delay_charge_percent', 10);
 
+        $activeProject = \App\Models\Project::active();
+        if ($activeProject) {
+            $rate = $activeProject->maintenance_rate;
+            $wwAmt = $activeProject->ww_amount;
+            $delayPct = $activeProject->delay_percent;
+        }
+
         $allottees = Allottee::all();
         $generated = 0;
         $skipped   = 0;
@@ -69,8 +76,15 @@ class MonthlyBillController extends Controller
             $maintenance = round($monthlyBase * $allottee->due_months, 2);
             $allottee->maintenance_charges = $maintenance;
 
-            // W&W: Mark as charged if applicable
-            $ww = $allottee->watch_ward_charges;
+            // W&W: Calculate dynamically for completed months
+            $wwStartDate = Carbon::create(2023, 7, 1);
+            $wwEndDate = $allottee->possession_date ? clone $allottee->possession_date : Carbon::now();
+            $wwMonths = 0;
+            if ($wwEndDate->gt($wwStartDate)) {
+                $wwMonths = $wwStartDate->diffInMonths($wwEndDate);
+            }
+            $ww = $wwMonths * $wwAmt;
+            
             if (!$allottee->ww_charged && $ww > 0) {
                 $allottee->ww_charged = true;
                 $allottee->ww_charged_date = $allottee->possession_date ?? now();
