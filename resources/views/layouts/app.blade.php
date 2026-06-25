@@ -366,8 +366,23 @@
             @endif
             @endif
 
+            {{-- ── Staff HR Management ──────────────────────────────────────── --}}
+            @if(in_array(auth()->user()->role, ['super_admin', 'data_entry', 'viewer']))
+            <div class="nav-section-title mt-3">Staff HR Management</div>
+            <a href="{{ route('admin.staff.attendance.index') }}" class="nav-link {{ request()->routeIs('admin.staff.attendance.*') ? 'active' : '' }}">
+                <i class="bi bi-calendar-check-fill"></i> Attendance
+            </a>
+            <a href="{{ route('admin.staff.payroll.index') }}" class="nav-link {{ request()->routeIs('admin.staff.payroll.*') ? 'active' : '' }}">
+                <i class="bi bi-cash-coin"></i> Payroll & Salary
+            </a>
+            <a href="{{ route('admin.staff.performance.index') }}" class="nav-link {{ request()->routeIs('admin.staff.performance.*') ? 'active' : '' }}">
+                <i class="bi bi-bar-chart-line"></i> Staff Performance
+            </a>
+            @endif
+
             <div class="nav-section-title mt-3">Portal</div>
             <a href="{{ route('portal.login') }}" class="nav-link {{ request()->routeIs('portal.*') ? 'active' : '' }}" target="_blank">
+
                 <i class="bi bi-person-badge-fill"></i> Allottee Portal <i class="bi bi-box-arrow-up-right ms-auto" style="font-size: 10px; width: auto;"></i>
             </a>
 

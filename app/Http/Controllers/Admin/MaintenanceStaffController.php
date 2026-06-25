@@ -32,10 +32,17 @@ class MaintenanceStaffController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'designation' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:20',
-            'user_id' => [
+            'name'         => 'required|string|max:255',
+            'designation'  => 'required|string|max:255',
+            'phone'        => 'nullable|string|max:20',
+            'cnic'         => 'nullable|string|max:20',
+            'joining_date' => 'nullable|date',
+            'shift'        => 'nullable|in:morning,evening,night,full_day',
+            'salary_type'  => 'nullable|in:monthly,daily',
+            'basic_salary' => 'nullable|numeric|min:0',
+            'daily_rate'   => 'nullable|numeric|min:0',
+            'allowances'   => 'nullable|numeric|min:0',
+            'user_id'      => [
                 'nullable',
                 'exists:users,id',
                 Rule::unique('maintenance_staff')
@@ -43,11 +50,18 @@ class MaintenanceStaffController extends Controller
         ]);
 
         MaintenanceStaff::create([
-            'name' => $request->name,
-            'designation' => $request->designation,
-            'phone' => $request->phone,
-            'user_id' => $request->user_id,
-            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+            'name'         => $request->name,
+            'designation'  => $request->designation,
+            'phone'        => $request->phone,
+            'cnic'         => $request->cnic,
+            'joining_date' => $request->joining_date,
+            'shift'        => $request->shift ?? 'full_day',
+            'salary_type'  => $request->salary_type ?? 'monthly',
+            'basic_salary' => $request->salary_type === 'monthly' ? $request->basic_salary : null,
+            'daily_rate'   => $request->salary_type === 'daily'   ? $request->daily_rate   : null,
+            'allowances'   => $request->allowances ?? 0,
+            'user_id'      => $request->user_id,
+            'is_active'    => $request->has('is_active') ? $request->boolean('is_active') : true,
         ]);
 
         return redirect()->route('admin.complaints.staff.index')->with('success', 'Maintenance staff member added successfully.');
@@ -56,10 +70,17 @@ class MaintenanceStaffController extends Controller
     public function update(Request $request, MaintenanceStaff $staff)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'designation' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:20',
-            'user_id' => [
+            'name'         => 'required|string|max:255',
+            'designation'  => 'required|string|max:255',
+            'phone'        => 'nullable|string|max:20',
+            'cnic'         => 'nullable|string|max:20',
+            'joining_date' => 'nullable|date',
+            'shift'        => 'nullable|in:morning,evening,night,full_day',
+            'salary_type'  => 'nullable|in:monthly,daily',
+            'basic_salary' => 'nullable|numeric|min:0',
+            'daily_rate'   => 'nullable|numeric|min:0',
+            'allowances'   => 'nullable|numeric|min:0',
+            'user_id'      => [
                 'nullable',
                 'exists:users,id',
                 Rule::unique('maintenance_staff')->ignore($staff->id)
@@ -67,11 +88,18 @@ class MaintenanceStaffController extends Controller
         ]);
 
         $staff->update([
-            'name' => $request->name,
-            'designation' => $request->designation,
-            'phone' => $request->phone,
-            'user_id' => $request->user_id,
-            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+            'name'         => $request->name,
+            'designation'  => $request->designation,
+            'phone'        => $request->phone,
+            'cnic'         => $request->cnic,
+            'joining_date' => $request->joining_date,
+            'shift'        => $request->shift ?? 'full_day',
+            'salary_type'  => $request->salary_type ?? 'monthly',
+            'basic_salary' => $request->salary_type === 'monthly' ? $request->basic_salary : null,
+            'daily_rate'   => $request->salary_type === 'daily'   ? $request->daily_rate   : null,
+            'allowances'   => $request->allowances ?? 0,
+            'user_id'      => $request->user_id,
+            'is_active'    => $request->has('is_active') ? $request->boolean('is_active') : true,
         ]);
 
         return redirect()->route('admin.complaints.staff.index')->with('success', 'Staff details updated successfully.');

@@ -86,7 +86,33 @@ Route::middleware('auth')->group(function () {
         Route::post('/{complaint}/remark',    [\App\Http\Controllers\Admin\ComplaintController::class, 'addRemark'])->name('remark');
         Route::get('/{complaint}',            [\App\Http\Controllers\Admin\ComplaintController::class, 'show'])->name('show');
     });
+
+    // ── STAFF HR MANAGEMENT ────────────────────────────────────────────────
+    Route::prefix('admin/staff')->name('admin.staff.')->group(function () {
+
+        // Attendance
+        Route::prefix('attendance')->name('attendance.')->group(function () {
+            Route::get('/',     [\App\Http\Controllers\Admin\StaffAttendanceController::class, 'index'])->name('index');
+            Route::post('/save',[\App\Http\Controllers\Admin\StaffAttendanceController::class, 'save'])->name('save');
+        });
+
+        // Payroll
+        Route::prefix('payroll')->name('payroll.')->group(function () {
+            Route::get('/',                [\App\Http\Controllers\Admin\StaffPayrollController::class, 'index'])->name('index');
+            Route::post('/generate',       [\App\Http\Controllers\Admin\StaffPayrollController::class, 'generate'])->name('generate');
+            Route::get('/{payroll}',       [\App\Http\Controllers\Admin\StaffPayrollController::class, 'show'])->name('show');
+            Route::post('/{payroll}/pay',  [\App\Http\Controllers\Admin\StaffPayrollController::class, 'markPaid'])->name('pay');
+        });
+
+        // Performance
+        Route::prefix('performance')->name('performance.')->group(function () {
+            Route::get('/',        [\App\Http\Controllers\Admin\StaffPerformanceController::class, 'index'])->name('index');
+            Route::get('/{staff}', [\App\Http\Controllers\Admin\StaffPerformanceController::class, 'show'])->name('show');
+        });
+    });
+
 });
+
 
 // ── ALLOTTEE PORTAL (no admin auth required) ────────────────────────
 Route::prefix('portal')->name('portal.')->group(function () {
