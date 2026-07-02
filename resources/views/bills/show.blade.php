@@ -347,65 +347,67 @@
         <table class="charges-table">
             <thead>
                 <tr>
-                    <th style="width:40%">Description</th>
-                    <th class="text-center">Rate</th>
-                    <th class="text-center">Duration / Basis</th>
+                    <th style="width:50%">Description</th>
                     <th class="text-end">Amount (Rs.)</th>
                 </tr>
             </thead>
             <tbody>
-                @if($dueMonths > 1)
+                @php
+                    $pCharge = $allottee->has_parking ? ($allottee->parking_charges ?: 500) : 0;
+                    $wCharge = $allottee->has_water ? ($allottee->water_charges ?: 1000) : 0;
+                    $baseMonthly = ($allottee->covered_area * $rate) + $pCharge + $wCharge;
+                    $mMonths = $baseMonthly > 0 ? max(1, round($maintenance / $baseMonthly, 1)) : ($allottee->due_months ?: 1);
+                @endphp
                 <tr>
                     <td>
-                        <strong>Previous Arrears (Maintenance)</strong>
-                        <div style="font-size:10px;color:#6b7280;">Past due balance for {{ $dueMonths - 1 }} month(s)</div>
+                        <strong>Maintenance Charges</strong>
+                        <div style="font-size:11px;color:#334155;margin-top:4px;">
+                            <span class="badge bg-light text-dark border me-1" style="font-weight:600;">Calculation Formula</span>
+                            {{ $allottee->covered_area }} Sq Ft @ Rs. {{ number_format($rate, 2) }}/sq ft
+                            @if($pCharge > 0) + Parking Rs. {{ number_format($pCharge) }} @endif
+                            @if($wCharge > 0) + Water Rs. {{ number_format($wCharge) }} @endif
+                            = <strong>Rs. {{ number_format($baseMonthly, 2) }}/month</strong> &times; <strong>{{ $mMonths }} month(s)</strong> billed
+                        </div>
                     </td>
-                    <td class="text-center">Rs. {{ number_format($rate, 2) }}/Sq Ft</td>
-                    <td class="text-center">{{ $dueMonths - 1 }} month(s)</td>
-                    <td class="text-end"><strong>{{ number_format($maintenance - $monthlyRate, 2) }}</strong></td>
+                    <td class="text-end"><strong>{{ number_format($maintenance, 2) }}</strong></td>
                 </tr>
-                @endif
-                @if($dueMonths > 0)
-                <tr>
-                    <td>
-                        <strong>Current Month Maintenance</strong>
-                        <div style="font-size:10px;color:#6b7280;">{{ $allottee->covered_area }} Sq Ft × Rs. {{ number_format($rate, 2) }}/Sq Ft</div>
-                    </td>
-                    <td class="text-center">Rs. {{ number_format($rate, 2) }}/Sq Ft</td>
-                    <td class="text-center">1 month</td>
-                    <td class="text-end"><strong>{{ number_format($monthlyRate, 2) }}</strong></td>
-                </tr>
-                @endif
                 @if($ww > 0)
                 <tr>
                     <td>
                         <strong>Watch & Ward Charges</strong>
-                        <div style="font-size:10px;color:#6b7280;">From 01-Jul-2023 to Possession Date</div>
+                        <div style="font-size:11px;color:#334155;margin-top:4px;">
+                            <span class="badge bg-light text-dark border me-1" style="font-weight:600;">Calculation Formula</span>
+                            Accrued @ <strong>Rs. {{ number_format($wwAmount) }}/month</strong> &times; <strong>{{ round($wwMonths, 1) }} months</strong> (From {{ \Carbon\Carbon::parse($wwCutoff)->format('d M Y') }})
+                        </div>
                     </td>
-                    <td class="text-center">Rs. {{ number_format($wwAmount) }}/month</td>
-                    <td class="text-center">{{ $wwMonths }} month(s)</td>
                     <td class="text-end"><strong>{{ number_format($ww, 2) }}</strong></td>
                 </tr>
                 @endif
-                <tr class="subtotal-row">
-                    <td colspan="3"><strong>Sub-Total (Maintenance + W&W)</strong></td>
-                    <td class="text-end"><strong>{{ number_format($maintenance + $ww, 2) }}</strong></td>
-                </tr>
                 @if($fine > 0)
                 <tr>
                     <td style="color:#dc2626;">
-                        <strong>Delay Surcharge ({{ $delayPct }}% Fine)</strong>
-                        <div style="font-size:10px;color:#ef4444;">Late payment penalty — Please pay before due date to avoid this charge</div>
+                        <strong>Delay Surcharge (Fine)</strong>
+                        <div style="font-size:11px;color:#dc2626;margin-top:4px;">
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1" style="font-weight:600;">Calculation Formula</span>
+                            <strong>{{ $delayPct }}%</strong> delayed payment surcharge penalty applied on overdue maintenance arrears as per policy
+                        </div>
                     </td>
-                    <td class="text-center" style="color:#dc2626;">{{ $delayPct }}%</td>
-                    <td class="text-center" style="color:#dc2626;">On sub-total</td>
                     <td class="text-end" style="color:#dc2626;"><strong>{{ number_format($fine, 2) }}</strong></td>
                 </tr>
                 @endif
                 <tr class="total-row">
-                    <td colspan="3">GROSS TOTAL PAYABLE</td>
-                    <td class="text-end">Rs. {{ number_format($total, 2) }}</td>
+                    <td>{{ $pending <= 0 ? 'TOTAL PAID AMOUNT' : 'GROSS TOTAL PAYABLE' }}</td>
+                    <td class="text-end">Rs. {{ number_format($pending <= 0 ? $paid : $total, 2) }}</td>
                 </tr>
+                @if(($advanceAmount ?? 0) > 0)
+                <tr style="background:#f0fdf4;">
+                    <td>
+                        <strong class="text-success">Advance Credit Carried Forward</strong>
+                        <div style="font-size:10px;color:#166534;">Prepaid surplus balance remaining for future bills</div>
+                    </td>
+                    <td class="text-end text-success"><strong>+Rs. {{ number_format($advanceAmount, 2) }}</strong></td>
+                </tr>
+                @endif
             </tbody>
         </table>
 
@@ -413,7 +415,6 @@
         <div class="late-notice">
             <i class="bi bi-exclamation-triangle-fill me-1"></i>
             <strong>IMPORTANT:</strong> A delay surcharge of <strong>{{ $delayPct }}%</strong> has been applied due to overdue payment.
-            Paying before <strong>{{ now()->endOfMonth()->format('d M Y') }}</strong> will help you avoid additional penalties.
             Total months overdue: <strong>{{ $dueMonths }}</strong>
         </div>
         @endif
@@ -424,7 +425,11 @@
             <div class="status-card s-paid">
                 <div class="s-lbl">Amount Paid</div>
                 <div class="s-val">Rs. {{ number_format($paid, 2) }}</div>
-                @if($allottee->payment_date)<div style="font-size:11px;margin-top:2px;">Last paid: {{ $allottee->payment_date->format('d M Y') }}</div>@endif
+                @if($paymentDate)
+                    <div style="font-size:11px;margin-top:2px;">Paid: {{ $paymentDate->format('d M Y') }} via {{ ucfirst($paymentMode ?? 'N/A') }}</div>
+                @else
+                    <div style="font-size:11px;margin-top:2px;">No payment on record</div>
+                @endif
             </div>
             <div class="status-card s-due">
                 <div class="s-lbl">Amount Pending (Due)</div>
@@ -434,28 +439,46 @@
         </div>
 
         {{-- AMOUNT DUE BOX (SNGPL style big box) --}}
-        <div class="amount-due-box">
-            <div>
-                <div class="ad-label">AMOUNT DUE — PAYABLE IMMEDIATELY</div>
-                <div class="ad-value">Rs. {{ number_format($pending, 2) }}</div>
-                <div class="ad-notice">
-                    <i class="bi bi-calendar-check me-1"></i>Pay before {{ now()->endOfMonth()->format('d M Y') }} to avoid additional surcharge
+        @if($pending <= 0)
+            <div class="amount-due-box" style="background: linear-gradient(135deg, #15803d, #166534);">
+                <div>
+                    <div class="ad-label" style="color:#dcfce7;">ACCOUNT BALANCE STATUS</div>
+                    <div class="ad-value" style="color:#ffffff; font-size: 26px;">PAID IN FULL</div>
+                    <div class="ad-notice" style="color:#dcfce7;">
+                        <i class="bi bi-check-circle-fill me-1"></i>Status: <strong>PAID / SETTLED</strong>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:11px;opacity:0.8;margin-bottom:4px;">File No.</div>
+                    <div style="font-size:22px;font-weight:900;">{{ $allottee->file_no }}</div>
+                    <div style="font-size:10px;opacity:0.7;">{{ $allottee->category }} Type — {{ $allottee->covered_area }} Sq Ft</div>
                 </div>
             </div>
-            <div style="text-align:right;">
-                <div style="font-size:11px;opacity:0.8;margin-bottom:4px;">File No.</div>
-                <div style="font-size:22px;font-weight:900;">{{ $allottee->file_no }}</div>
-                <div style="font-size:10px;opacity:0.7;">{{ $allottee->category }} Type — {{ $allottee->covered_area }} Sq Ft</div>
+        @else
+            <div class="amount-due-box">
+                <div>
+                    <div class="ad-label">AMOUNT DUE — PAYABLE IMMEDIATELY</div>
+                    <div class="ad-value">Rs. {{ number_format($pending, 2) }}</div>
+                    <div class="ad-notice">
+                        <i class="bi bi-calendar-check me-1"></i>Status: <strong>{{ strtoupper($displayStatus) }}</strong>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:11px;opacity:0.8;margin-bottom:4px;">File No.</div>
+                    <div style="font-size:22px;font-weight:900;">{{ $allottee->file_no }}</div>
+                    <div style="font-size:10px;opacity:0.7;">{{ $allottee->category }} Type — {{ $allottee->covered_area }} Sq Ft</div>
+                </div>
             </div>
-        </div>
+        @endif
 
         {{-- PREVIOUS PAYMENT HISTORY --}}
         <div class="bill-section-title">Previous Payment History</div>
-        @if($lastPayment)
+        @if($paymentsHistory->isNotEmpty())
         <table class="hist-table">
             <thead>
                 <tr>
                     <th>Payment Date</th>
+                    <th>Billing Month</th>
                     <th class="text-end">Amount Paid (Rs.)</th>
                     <th class="text-center">Payment Mode</th>
                     <th>Reference No.</th>
@@ -463,13 +486,16 @@
                 </tr>
             </thead>
             <tbody>
+                @foreach($paymentsHistory as $payment)
                 <tr>
-                    <td>{{ $lastPayment['date'] }}</td>
-                    <td class="text-end"><strong>{{ number_format($lastPayment['amount'], 2) }}</strong></td>
-                    <td class="text-center">{{ $lastPayment['mode'] }}</td>
-                    <td>{{ $lastPayment['ref'] }}</td>
-                    <td class="text-end"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">RECEIVED</span></td>
+                    <td>{{ $payment['date'] }}</td>
+                    <td>{{ $payment['month'] }}</td>
+                    <td class="text-end"><strong>{{ number_format($payment['amount'], 2) }}</strong></td>
+                    <td class="text-center">{{ $payment['mode'] }}</td>
+                    <td>{{ $payment['ref'] }}</td>
+                    <td class="text-end"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">{{ $payment['status'] }}</span></td>
                 </tr>
+                @endforeach
             </tbody>
         </table>
         @else
@@ -516,6 +542,38 @@
                 </div>
             </div>
         </div>
+
+        @php
+            $raastConfigured = (!empty($qrCodeB64) || !empty($qrData)) && !empty($bankAccNo);
+        @endphp
+        @if($raastConfigured)
+        <div style="margin-top:16px;">
+            <div class="bill-section-title">RAAST QR PAYMENT INSTRUCTIONS</div>
+            <div style="background:#f0fdf4; border:1px solid #16a34a; border-radius:8px; padding:16px; display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+                <div style="text-align:center; flex-shrink:0; background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:10px; margin: 0 auto;">
+                    @if(!empty($qrCodeB64))
+                        <img src="{{ $qrCodeB64 }}" alt="Raast QR Code" style="width:120px; height:120px; display:block; margin:0 auto;">
+                    @else
+                        <div id="qrCanvas" style="width:120px; height:120px; margin:0 auto;"></div>
+                    @endif
+                    <div style="font-size:11px; font-weight:700; color:#166534; margin-top:6px;">Scan via Raast</div>
+                </div>
+                <div style="flex:1; min-width:260px;">
+                    <ol style="margin:0 0 10px 16px; padding:0; color:#374151; font-size:12px; line-height:1.8;">
+                        <li>Open any Raast-enabled mobile banking app or digital wallet.</li>
+                        <li>Select the <strong>Scan QR</strong> option.</li>
+                        <li>Scan the Raast QR Code printed on this bill.</li>
+                        <li>Verify the payment details and payable amount.</li>
+                        <li>Confirm the payment.</li>
+                        <li>Keep the transaction receipt for your record.</li>
+                    </ol>
+                    <div style="font-size:11px; color:#166534; background:#dcfce7; padding:10px 14px; border-radius:6px; border-left:4px solid #16a34a; margin-top:12px; line-height:1.6;">
+                        <strong>Note:</strong> After successful payment through Raast, your payment status will be updated in the maintenance management system according to the existing payment reconciliation process.
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
 
         {{-- MAILING ADDRESS --}}
         @if($allottee->mailing_address)
@@ -566,8 +624,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (canvas && typeof QRCode !== 'undefined') {
         new QRCode(canvas, {
             text: qrData,
-            width: 100,
-            height: 100,
+            width: 120,
+            height: 120,
             colorDark: '#0f4423',
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.M

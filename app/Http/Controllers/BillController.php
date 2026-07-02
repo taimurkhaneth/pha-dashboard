@@ -33,37 +33,123 @@ class BillController extends Controller
         $bankBranch = Setting::getValue('bank_branch', 'Islamabad Main Branch');
 
         $monthlyRate = $allottee->covered_area * $rate;
-        $maintenance = $allottee->maintenance_charges;
-        
-        // Watch & Ward Logic: Charged for completed months between 01-Jul-2023 and Possession Date.
-        $wwStartDate = Carbon::create(2023, 7, 1);
-        $wwEndDate = $allottee->possession_date ? clone $allottee->possession_date : Carbon::now();
-        $wwMonths = 0;
-        if ($wwEndDate->gt($wwStartDate)) {
-            $wwMonths = $wwStartDate->diffInMonths($wwEndDate);
-        }
-        $ww = $wwMonths * $wwAmount;
-        
-        $fine = $allottee->fine;
-        $total = $maintenance + $ww + $fine;
-        $paid = (float) $allottee->amount_paid;
-        $pending = max(0, $total - $paid);
-        $dueMonths = $allottee->due_months ?? 0;
-        $billMonth = Carbon::now()->format('F Y');
 
-        // Previous payment history (single record we have)
-        $lastPayment = null;
-        if ($allottee->payment_date && $paid > 0) {
-            $lastPayment = [
-                'date' => $allottee->payment_date->format('d M Y'),
-                'amount' => $paid,
-                'mode' => ucfirst($allottee->payment_mode ?? 'N/A'),
-                'ref' => $allottee->payment_ref ?? '—',
-            ];
+        // Calculate maximum allowed month dynamically
+        $currentBillingMonthSetting = Setting::getValue('current_billing_month', '2026-07');
+        $allowFutureBilling = (bool) Setting::getValue('allow_future_billing', 0);
+        $maxMonthsAhead = (int) Setting::getValue('max_billing_months_ahead', 1);
+
+        if ($allowFutureBilling) {
+            $maxAllowedDate = Carbon::createFromFormat('Y-m', $currentBillingMonthSetting)->addMonths($maxMonthsAhead);
+            $maxAllowedMonth = $maxAllowedDate->format('Y-m');
+        } else {
+            $maxAllowedMonth = $currentBillingMonthSetting;
         }
 
-        // QR code data string
-        $qrData = "PHA|ACC:{$bankAccNo}|REF:{$allottee->file_no}|AMT:PKR " . number_format($pending, 2);
+        // Check if there is a generated bill snapshot in the database (restricted to allowed month)
+        $latestBill = \App\Models\Bill::withoutGlobalScopes()
+            ->where('allottee_id', $allottee->id)
+            ->where('bill_month', '<=', $maxAllowedMonth)
+            ->orderByDesc('bill_month')
+            ->first();
+
+        $advanceAmount = 0.00;
+
+        if ($latestBill) {
+            $maintenance   = (float)$latestBill->maintenance_amount;
+            $ww            = (float)$latestBill->ww_amount;
+            $wwMonths      = $wwAmount > 0 ? (float)($ww / $wwAmount) : 0;
+            $fine          = (float)$latestBill->fine_amount;
+            $total         = $maintenance + $ww + $fine;
+            $paid          = (float)$latestBill->paid_amount;
+            $pending       = max(0.00, (float)($latestBill->total_amount - $paid));
+            $dueMonths     = $allottee->overdue_months ?? 0;
+            $billMonth     = Carbon::createFromFormat('Y-m', $latestBill->bill_month)->format('F Y');
+            $status        = $latestBill->status;
+            $displayStatus = $latestBill->display_status;
+            $paymentDate   = $latestBill->payment_date;
+            $paymentMode   = $latestBill->payment_mode;
+
+            // Calculate advance credit: if total paid exceeds total generated cumulative charges
+            $cumulativeGenerated = (float)($latestBill->maintenance_amount + $latestBill->ww_amount + $latestBill->fine_amount);
+            if ((float)$allottee->amount_paid > $cumulativeGenerated) {
+                $advanceAmount = (float)($allottee->amount_paid - $cumulativeGenerated);
+            }
+        } else {
+            $maintenance   = $allottee->maintenance_charges;
+            $wwStartDate   = Carbon::create(2023, 7, 1);
+            $wwEndDate     = $allottee->possession_date ? clone $allottee->possession_date : Carbon::now();
+            $wwMonths      = 0;
+            if ($wwEndDate->gt($wwStartDate)) {
+                $wwMonths = $wwStartDate->diffInMonths($wwEndDate);
+            }
+            $ww            = $wwMonths * $wwAmount;
+            $fine          = $allottee->fine;
+            $total         = $maintenance + $ww + $fine;
+            $paid          = (float)$allottee->amount_paid;
+            $pending       = max(0.00, $total - $paid);
+            $dueMonths     = $allottee->overdue_months ?? 0;
+            $billMonth     = Carbon::createFromFormat('Y-m', $currentBillingMonthSetting)->format('F Y');
+            $status        = 'unpaid';
+            $displayStatus = 'Unpaid';
+            $paymentDate   = $allottee->payment_date;
+            $paymentMode   = $allottee->payment_mode;
+
+            if ((float)$allottee->amount_paid > $total) {
+                $advanceAmount = (float)($allottee->amount_paid - $total);
+            }
+        }
+
+        // Build list of all payment allocations from historical bills
+        $paymentsHistory = \App\Models\Bill::withoutGlobalScopes()
+            ->where('allottee_id', $allottee->id)
+            ->where('paid_amount', '>', 0)
+            ->orderByDesc('payment_date')
+            ->orderByDesc('bill_month')
+            ->get()
+            ->map(function ($b) {
+                return [
+                    'date' => $b->payment_date ? $b->payment_date->format('d M Y') : '—',
+                    'amount' => (float)$b->paid_amount,
+                    'mode' => ucfirst($b->payment_mode ?? 'N/A'),
+                    'ref' => $b->payment_ref ?? '—',
+                    'month' => Carbon::createFromFormat('Y-m', $b->bill_month)->format('M Y'),
+                    'status' => $b->display_status,
+                ];
+            });
+
+        // Generate official Raast EMVCo (TLV) QR code payload
+        $formatTlv = function ($id, $val) {
+            return sprintf("%02s%02d%s", $id, strlen($val), $val);
+        };
+        $amountStr = number_format(max(0, $pending), 2, '.', '');
+        $tlv  = $formatTlv('00', '01'); // Payload Format Indicator
+        $tlv .= $formatTlv('01', '12'); // Point of Initiation Method (12 = Dynamic)
+        $sub28 = $formatTlv('00', 'pk.com.raast') . $formatTlv('01', $bankAccNo ?: 'PK00RAAST00000000000000');
+        $tlv .= $formatTlv('28', $sub28); // Raast Merchant Account Info
+        $tlv .= $formatTlv('52', '8699'); // MCC: Government Services
+        $tlv .= $formatTlv('53', '586');  // Currency: 586 = PKR
+        $tlv .= $formatTlv('54', $amountStr); // Transaction Amount
+        $tlv .= $formatTlv('58', 'PK');   // Country Code
+        $tlv .= $formatTlv('59', substr('PHA Foundation', 0, 25)); // Merchant Name
+        $tlv .= $formatTlv('60', substr('Islamabad', 0, 15));      // Merchant City
+        $sub62 = $formatTlv('01', substr($allottee->file_no ?? 'INV', 0, 25));
+        $tlv .= $formatTlv('62', $sub62); // Additional Data: Bill Reference
+
+        $payloadForCrc = $tlv . '6304';
+        $crc = 0xFFFF;
+        $bytes = unpack('C*', $payloadForCrc);
+        foreach ($bytes as $byte) {
+            $crc ^= ($byte << 8);
+            for ($i = 0; $i < 8; $i++) {
+                if (($crc & 0x8000) > 0) {
+                    $crc = (($crc << 1) ^ 0x1021) & 0xFFFF;
+                } else {
+                    $crc = ($crc << 1) & 0xFFFF;
+                }
+            }
+        }
+        $qrData = $payloadForCrc . strtoupper(str_pad(dechex($crc), 4, '0', STR_PAD_LEFT));
 
         // Generate QR code as SVG (no Imagick required), embed as base64 data URI
         try {
@@ -88,9 +174,10 @@ class BillController extends Controller
             'allottee',
             'rate', 'wwAmount', 'wwCutoff', 'delayPct', 'wwMonths',
             'monthlyRate', 'maintenance', 'ww', 'fine', 'total',
-            'paid', 'pending', 'dueMonths', 'billMonth', 'lastPayment',
+            'paid', 'pending', 'dueMonths', 'billMonth', 'paymentsHistory', 'status', 'displayStatus',
             'bankAccNo', 'bankName', 'bankBranch', 'qrData',
-            'qrSvg', 'qrCodeB64', 'govtLogoB64', 'phaLogoB64', 'oneLinkB64'
+            'qrSvg', 'qrCodeB64', 'govtLogoB64', 'phaLogoB64', 'oneLinkB64',
+            'paymentDate', 'paymentMode', 'advanceAmount'
         );
     }
 
@@ -104,12 +191,19 @@ class BillController extends Controller
     /* ── GET /bills/{allottee}  — web view ── */
     public function show(Allottee $allottee)
     {
+        if (!auth()->check() && session('portal_allottee_id') !== $allottee->id) {
+            abort(403, 'Unauthorized action.');
+        }
         return view('bills.show', $this->billData($allottee));
     }
 
     /* ── GET /bills/{allottee}/pdf  — download PDF ── */
     public function pdf(Allottee $allottee)
     {
+        if (!auth()->check() && session('portal_allottee_id') !== $allottee->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $data = $this->billData($allottee);
         $pdf = Pdf::loadView('bills.pdf', $data)
             ->setPaper('a4', 'portrait')
@@ -118,8 +212,18 @@ class BillController extends Controller
             ->setOption('margin_bottom', 5)
             ->setOption('margin_left', 7)
             ->setOption('margin_right', 7);
-        $filename = 'PHA-Bill-' . str_replace('/', '-', $allottee->file_no) . '.pdf';
-        return $pdf->download($filename);
+
+        $monthStr = Carbon::now()->format('F_Y');
+        $cleanFileNo = str_replace('/', '-', $allottee->file_no);
+        $filename = "Maintenance_Bill_{$cleanFileNo}_{$monthStr}.pdf";
+
+        $output = $pdf->output();
+
+        return response($output, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Length' => strlen($output)
+        ]);
     }
 
     /* ── GET /bills/search  — quick search by CNIC/Mobile/Name/FileNo ── */
