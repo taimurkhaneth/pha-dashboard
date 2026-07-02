@@ -136,6 +136,22 @@ class BillController extends Controller
         $sub62 = $formatTlv('01', substr($allottee->file_no ?? 'INV', 0, 25));
         $tlv .= $formatTlv('62', $sub62); // Additional Data: Bill Reference
 
+        // Project I-16/3 identification extension (Tag 80 Unreserved Template)
+        $projName = strtoupper($allottee->project?->name ?? '');
+        $projCode = strtoupper($allottee->project?->code ?? '');
+        if ($allottee->project_id == 1 || str_contains($projName, 'I-16/3') || str_contains($projCode, 'I163')) {
+            $info = [];
+            if (!empty(trim((string)($allottee->name ?? '')))) $info['name'] = trim((string)$allottee->name);
+            $info['project'] = 'I-16/3';
+            if (!empty(trim((string)($allottee->block_no ?? '')))) $info['block'] = trim((string)$allottee->block_no);
+            if (!empty(trim((string)($allottee->floor ?? '')))) $info['floor'] = trim((string)$allottee->floor);
+            if (!empty(trim((string)($allottee->flat_no ?? '')))) $info['flat'] = trim((string)$allottee->flat_no);
+            $idJson = json_encode($info, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (!empty($idJson) && strlen($idJson) <= 99) {
+                $tlv .= $formatTlv('80', $idJson);
+            }
+        }
+
         $payloadForCrc = $tlv . '6304';
         $crc = 0xFFFF;
         $bytes = unpack('C*', $payloadForCrc);
