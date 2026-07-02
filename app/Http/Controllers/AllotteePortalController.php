@@ -75,9 +75,17 @@ class AllotteePortalController extends Controller
         $bankName     = Setting::getValue('bank_name', 'National Bank of Pakistan');
         $bankBranch   = Setting::getValue('bank_branch', 'Islamabad Main Branch');
 
+        $qrSvg = '';
+        $qrData = '';
+        if ($latestBill && $latestBill->status !== 'paid' && $latestBill->status !== 'settled') {
+            $billData = app(\App\Http\Controllers\BillController::class)->billData($allottee);
+            $qrSvg    = $billData['qrSvg'] ?? '';
+            $qrData   = $billData['qrData'] ?? '';
+        }
+
         return view('portal.dashboard', compact(
             'allottee', 'monthlyBills', 'hasMonthlyBills', 'latestBill',
-            'bankAccNo', 'bankName', 'bankBranch'
+            'bankAccNo', 'bankName', 'bankBranch', 'qrSvg', 'qrData'
         ));
     }
 

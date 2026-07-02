@@ -89,28 +89,44 @@
         <!-- Bill Breakdown / History -->
         <div class="col-md-7">
             <div class="allottee-card mb-3">
+                @php
+                    $maintVal = $latestBill ? $latestBill->maintenance_amount : $allottee->maintenance_charges;
+                    $wwVal = $latestBill ? $latestBill->ww_amount : $allottee->watch_ward_charges;
+                    $fineVal = $latestBill ? $latestBill->fine_amount : $allottee->fine;
+                    $totalVal = $latestBill ? ($latestBill->maintenance_amount + $latestBill->ww_amount + $latestBill->fine_amount) : $allottee->total_maintenance_charges;
+                @endphp
                 <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-receipt me-2" style="color:#1B6B35;"></i>Current Account Snapshot</h6>
                 <div class="bill-row">
                     <span class="bill-label">Maintenance Charges</span>
-                    <span class="bill-value">Rs. {{ number_format($allottee->maintenance_charges) }}</span>
+                    <span class="bill-value">Rs. {{ number_format($maintVal) }}</span>
                 </div>
-                @if($allottee->watch_ward_charges > 0)
+                @if($wwVal > 0)
                 <div class="bill-row">
                     <span class="bill-label">Watch & Ward Charges</span>
-                    <span class="bill-value">Rs. {{ number_format($allottee->watch_ward_charges) }}</span>
+                    <span class="bill-value">Rs. {{ number_format($wwVal) }}</span>
                 </div>
                 @endif
-                @if($allottee->fine > 0)
+                @if($fineVal > 0)
                 <div class="bill-row">
                     <span class="bill-label">Delay Charges (10% Fine)</span>
-                    <span class="bill-value" style="color:#dc2626;">Rs. {{ number_format($allottee->fine) }}</span>
+                    <span class="bill-value" style="color:#dc2626;">Rs. {{ number_format($fineVal) }}</span>
                 </div>
                 @endif
                 <div class="total-box mt-3">
-                    <div style="font-size:11px;opacity:0.8;">TOTAL PAYABLE</div>
-                    <div style="font-size:24px;font-weight:900;">Rs. {{ number_format($allottee->total_maintenance_charges) }}</div>
-                    <div style="font-size:11px;opacity:0.7;">{{ $allottee->due_months ?? 0 }} months overdue</div>
+                    <div style="font-size:11px;opacity:0.8;">{{ $allottee->amount_pending <= 0 ? 'TOTAL CHARGES ACCRUED (FULLY PAID)' : 'NET BALANCE PAYABLE' }}</div>
+                    <div style="font-size:24px;font-weight:900;">Rs. {{ number_format($allottee->amount_pending <= 0 ? $totalVal : $allottee->amount_pending) }}</div>
+                    <div style="font-size:11px;opacity:0.7;">{{ $allottee->overdue_months ?? 0 }} months overdue</div>
                 </div>
+
+                @if($allottee->amount_paid > $allottee->total_maintenance_charges)
+                <div class="alert alert-success mt-3 mb-0 py-2 px-3 d-flex justify-content-between align-items-center" style="border-radius:10px;">
+                    <div>
+                        <strong style="font-size:13px;">Advance Credit Carried Forward</strong><br>
+                        <span style="font-size:11px; opacity:0.85;">Prepaid surplus balance available for future billing cycles</span>
+                    </div>
+                    <div style="font-size:16px; font-weight:800;">+Rs. {{ number_format($allottee->amount_paid - $allottee->total_maintenance_charges, 2) }}</div>
+                </div>
+                @endif
 
                 <!-- Payment Status -->
                 <div class="row g-2 mt-3">
@@ -170,6 +186,49 @@
                 </div>
             </div>
             @endif
+
+            <!-- Quick Payment / Raast Payment Card -->
+            <div class="allottee-card mb-3">
+                <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-qr-code-scan me-2" style="color:#1B6B35;"></i>Quick Payment / Raast Payment</h6>
+                @if($latestBill && $latestBill->status !== 'paid' && $latestBill->status !== 'settled' && !empty($qrSvg))
+                <div class="row align-items-center g-3">
+                    <div class="col-md-5 text-center">
+                        <div class="qr-container bg-white p-3 rounded border shadow-sm d-inline-block mb-2" style="border-color:#cbd5e1 !important;">
+                            {!! $qrSvg !!}
+                        </div>
+                        <div class="d-flex justify-content-center gap-1 flex-wrap mt-1">
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:11px;" onclick="downloadDashboardQr()">
+                                <i class="bi bi-download"></i> Download
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:11px;" onclick="printDashboardQr()">
+                                <i class="bi bi-printer"></i> Print
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:11px;" onclick="copyDashRefNumber('{{ $allottee->file_no }}')">
+                                <i class="bi bi-clipboard"></i> Copy Ref
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; font-size:12px; color:#334155;">
+                            <div class="fw-bold text-dark mb-2" style="font-size:13px;"><i class="bi bi-info-circle-fill text-success me-1"></i> Pay via Raast QR:</div>
+                            <ol class="mb-0 ps-3" style="line-height:1.7;">
+                                <li>Open any Raast-enabled mobile banking app</li>
+                                <li>Select <strong>“Scan QR”</strong> option</li>
+                                <li>Scan the QR code displayed on screen</li>
+                                <li>Verify bill details (name, amount, reference)</li>
+                                <li>Confirm and complete payment</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                @else
+                <div class="p-3 bg-light rounded text-center border">
+                    <i class="bi bi-check-circle-fill me-2 text-success" style="font-size:1.2rem;"></i>
+                    <strong class="text-success">No pending dues</strong>
+                    <div style="font-size:12px; color:#64748b; margin-top:4px;">You have no unpaid maintenance bills requiring QR payment at this time.</div>
+                </div>
+                @endif
+            </div>
 
             <div class="allottee-card mb-3">
                 <h6 style="font-weight:700;margin-bottom:16px;"><i class="bi bi-credit-card-fill me-2" style="color:#2563eb;"></i>Payment Instructions</h6>
@@ -256,5 +315,58 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function downloadDashboardQr() {
+        const svg = document.querySelector('.qr-container svg');
+        if (!svg) return;
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+        const DOMURL = window.URL || window.webkitURL || window;
+        const url = DOMURL.createObjectURL(svgBlob);
+        
+        const img = new Image();
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width || 300;
+            canvas.height = img.height || 300;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            DOMURL.revokeObjectURL(url);
+            
+            const pngUrl = canvas.toDataURL('image/png');
+            const downloadLink = document.createElement('a');
+            downloadLink.href = pngUrl;
+            downloadLink.download = 'Raast-QR-Dashboard-{{ $allottee->file_no }}.png';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        };
+        img.src = url;
+    }
+
+    function printDashboardQr() {
+        const svg = document.querySelector('.qr-container svg');
+        if (!svg) return;
+        const printWin = window.open('', '_blank', 'width=400,height=400');
+        printWin.document.write('<html><head><title>Print Raast QR Code</title></head><body style="text-align:center;padding:40px;font-family:sans-serif;">');
+        printWin.document.write('<h4>Raast QR Code Payment</h4>');
+        printWin.document.write('<p>File No: {{ $allottee->file_no }}</p>');
+        printWin.document.write('<div>' + svg.outerHTML + '</div>');
+        printWin.document.write('</body></html>');
+        printWin.document.close();
+        printWin.focus();
+        setTimeout(() => { printWin.print(); printWin.close(); }, 300);
+    }
+
+    function copyDashRefNumber(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Reference Number (' + text + ') copied to clipboard!');
+        }).catch(err => {
+            prompt('Copy Reference Number:', text);
+        });
+    }
+</script>
 </body>
 </html>
