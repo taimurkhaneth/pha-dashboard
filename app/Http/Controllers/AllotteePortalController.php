@@ -47,14 +47,36 @@ class AllotteePortalController extends Controller
         if (!$id) return redirect()->route('portal.login');
 
         $allottee     = Allottee::findOrFail($id);
-        $monthlyBills = Bill::where('allottee_id', $allottee->id)->orderByDesc('bill_month')->get();
+
+        // Calculate maximum allowed month dynamically
+        $currentBillingMonthSetting = Setting::getValue('current_billing_month', '2026-07');
+        $allowFutureBilling = (bool) Setting::getValue('allow_future_billing', 0);
+        $maxMonthsAhead = (int) Setting::getValue('max_billing_months_ahead', 1);
+
+        if ($allowFutureBilling) {
+            $maxAllowedDate = \Carbon\Carbon::createFromFormat('Y-m', $currentBillingMonthSetting)->addMonths($maxMonthsAhead);
+            $maxAllowedMonth = $maxAllowedDate->format('Y-m');
+        } else {
+            $maxAllowedMonth = $currentBillingMonthSetting;
+        }
+
+        $monthlyBills = Bill::where('allottee_id', $allottee->id)
+            ->where('bill_month', '<=', $maxAllowedMonth)
+            ->orderByDesc('bill_month')
+            ->get();
+
+        $latestBill   = Bill::where('allottee_id', $allottee->id)
+            ->where('bill_month', '<=', $maxAllowedMonth)
+            ->orderByDesc('bill_month')
+            ->first();
+
         $hasMonthlyBills = $monthlyBills->isNotEmpty();
         $bankAccNo    = Setting::getValue('bank_account_no', 'PHA-001-NBP-001');
         $bankName     = Setting::getValue('bank_name', 'National Bank of Pakistan');
         $bankBranch   = Setting::getValue('bank_branch', 'Islamabad Main Branch');
 
         return view('portal.dashboard', compact(
-            'allottee', 'monthlyBills', 'hasMonthlyBills',
+            'allottee', 'monthlyBills', 'hasMonthlyBills', 'latestBill',
             'bankAccNo', 'bankName', 'bankBranch'
         ));
     }
@@ -65,13 +87,33 @@ class AllotteePortalController extends Controller
         if (!$id) return redirect()->route('portal.login');
 
         $allottee  = Allottee::findOrFail($id);
+
+        // Calculate maximum allowed month dynamically
+        $currentBillingMonthSetting = Setting::getValue('current_billing_month', '2026-07');
+        $allowFutureBilling = (bool) Setting::getValue('allow_future_billing', 0);
+        $maxMonthsAhead = (int) Setting::getValue('max_billing_months_ahead', 1);
+
+        if ($allowFutureBilling) {
+            $maxAllowedDate = \Carbon\Carbon::createFromFormat('Y-m', $currentBillingMonthSetting)->addMonths($maxMonthsAhead);
+            $maxAllowedMonth = $maxAllowedDate->format('Y-m');
+        } else {
+            $maxAllowedMonth = $currentBillingMonthSetting;
+        }
+
+        if ($month > $maxAllowedMonth) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $bill      = Bill::where('allottee_id', $allottee->id)->where('bill_month', $month)->firstOrFail();
+        $billData  = app(\App\Http\Controllers\BillController::class)->billData($allottee);
+        $qrSvg     = $billData['qrSvg'] ?? '';
+        $qrData    = $billData['qrData'] ?? '';
         $bankAccNo = Setting::getValue('bank_account_no', 'PHA-001-NBP-001');
         $bankName  = Setting::getValue('bank_name', 'National Bank of Pakistan');
         $bankBranch= Setting::getValue('bank_branch', 'Islamabad Main Branch');
         $rate      = (float) Setting::getValue('maintenance_rate_per_sqft', 3.07);
 
-        return view('portal.bill_detail', compact('allottee', 'bill', 'bankAccNo', 'bankName', 'bankBranch', 'rate'));
+        return view('portal.bill_detail', compact('allottee', 'bill', 'bankAccNo', 'bankName', 'bankBranch', 'rate', 'qrSvg', 'qrData'));
     }
 
     public function logout(Request $request)

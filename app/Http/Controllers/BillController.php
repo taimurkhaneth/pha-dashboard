@@ -13,7 +13,7 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class BillController extends Controller
 {
     /* ── shared: build all bill data for one allottee ── */
-    private function billData(Allottee $allottee): array
+    public function billData(Allottee $allottee): array
     {
         $activeProject = \App\Models\Project::active();
         $rate = (float) Setting::getValue('maintenance_rate_per_sqft', 3.07);
