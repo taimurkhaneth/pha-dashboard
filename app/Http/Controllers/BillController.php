@@ -136,30 +136,30 @@ class BillController extends Controller
         $sub62 = $formatTlv('01', substr($allottee->file_no ?? 'INV', 0, 25));
         $tlv .= $formatTlv('62', $sub62); // Additional Data: Bill Reference
 
-        // Project I-16/3 identification extension (Tag 80 Unreserved Template in safe ASCII pipe format)
+        // Project I-16/3 identification extension (Tag 80 Unreserved Template in safe compact hyphen format)
         $projName = strtoupper($allottee->project?->name ?? '');
         $projCode = strtoupper($allottee->project?->code ?? '');
         if ($allottee->project_id == 1 || str_contains($projName, 'I-16/3') || str_contains($projCode, 'I163')) {
-            $cleanAscii = function ($str) {
-                $cleaned = preg_replace('/[^\x20-\x7E]/', '', (string)$str);
-                $cleaned = str_replace(['{', '}', '"', "'", '|', "\r", "\n"], '', $cleaned);
-                return trim(preg_replace('/\s+/', ' ', $cleaned));
+            $cleanAlphaNum = function ($str) {
+                return preg_replace('/[^A-Z0-9]/', '', strtoupper((string)$str));
             };
 
-            $parts = [];
-            $name = $cleanAscii($allottee->name ?? '');
-            if ($name !== '') $parts[] = "name={$name}";
-            $parts[] = "project=I-16/3";
-            $block = $cleanAscii($allottee->block_no ?? '');
-            if ($block !== '') $parts[] = "block={$block}";
-            $floor = $cleanAscii($allottee->floor ?? '');
-            if ($floor !== '') $parts[] = "floor={$floor}";
-            $flat = $cleanAscii($allottee->flat_no ?? '');
-            if ($flat !== '') $parts[] = "flat={$flat}";
+            $p = 'I163';
+            $b = $cleanAlphaNum($allottee->block_no ?? '');
+            $f = $cleanAlphaNum($allottee->floor ?? '');
+            $a = $cleanAlphaNum($allottee->flat_no ?? '');
+            $n = $cleanAlphaNum($allottee->name ?? '');
 
-            $asciiPayload = implode('|', $parts);
-            if (!empty($asciiPayload) && strlen($asciiPayload) <= 99) {
-                $tlv .= $formatTlv('80', $asciiPayload);
+            $parts = [];
+            $parts[] = $p;
+            if ($b !== '') $parts[] = "B{$b}";
+            if ($f !== '') $parts[] = "F{$f}";
+            if ($a !== '') $parts[] = "A{$a}";
+            if ($n !== '') $parts[] = $n;
+
+            $compactPayload = implode('-', $parts);
+            if (!empty($compactPayload) && strlen($compactPayload) <= 99) {
+                $tlv .= $formatTlv('80', $compactPayload);
             }
         }
 
