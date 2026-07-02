@@ -144,16 +144,46 @@ class BillController extends Controller
                 return preg_replace('/[^A-Z0-9]/', '', strtoupper((string)$str));
             };
 
+            $normalizeFloor = function ($floor) use ($cleanAlphaNum) {
+                $raw = trim((string)$floor);
+                $upper = strtoupper(preg_replace('/\s+/', ' ', $raw));
+                $map = [
+                    'GROUND FLOOR'       => 'GF',
+                    'GROUND'             => 'GF',
+                    'FIRST FLOOR'        => 'FF',
+                    '1ST FLOOR'          => 'FF',
+                    'SECOND FLOOR'       => 'SF',
+                    '2ND FLOOR'          => 'SF',
+                    'THIRD FLOOR'        => 'TF',
+                    '3RD FLOOR'          => 'TF',
+                    'FOURTH FLOOR'       => '4F',
+                    '4TH FLOOR'          => '4F',
+                    'FIFTH FLOOR'        => '5F',
+                    '5TH FLOOR'          => '5F',
+                    'LOWER GROUND'       => 'LG',
+                    'LOWER GROUND FLOOR' => 'LGF',
+                    'BASEMENT'           => 'BS',
+                ];
+                if (isset($map[$upper])) {
+                    return $map[$upper];
+                }
+                $cleaned = $cleanAlphaNum($upper);
+                if (is_numeric($cleaned)) {
+                    return "F{$cleaned}";
+                }
+                return $cleaned;
+            };
+
             $p = 'I163';
             $b = $cleanAlphaNum($allottee->block_no ?? '');
-            $f = $cleanAlphaNum($allottee->floor ?? '');
+            $f = $normalizeFloor($allottee->floor ?? '');
             $a = $cleanAlphaNum($allottee->flat_no ?? '');
             $n = $cleanAlphaNum($allottee->name ?? '');
 
             $parts = [];
             $parts[] = $p;
             if ($b !== '') $parts[] = "B{$b}";
-            if ($f !== '') $parts[] = "F{$f}";
+            if ($f !== '') $parts[] = $f;
             if ($a !== '') $parts[] = "A{$a}";
             if ($n !== '') $parts[] = $n;
 
